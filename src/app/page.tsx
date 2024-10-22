@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import CircularProgress from "@mui/material/CircularProgress";
+import Snackbar from "@mui/material/Snackbar";
 
 const Home = () => {
   const [text, setText] = useState<string>("");
@@ -9,8 +11,21 @@ const Home = () => {
   const [selectedSentence, setSelectedSentence] = useState<string>("");
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const handleClick = () => {
+    setError(true);
+  };
+
+  const handleClose = (event: any, reason: string) => {
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setError(false);
+  };
 
   useEffect(() => {
     if (audioUrl && audioRef.current) {
@@ -38,7 +53,7 @@ const Home = () => {
   };
 
   const generateSong = async () => {
-    setLoading(true)
+    setLoading(true);
     const result = await fetch("/api/generate", {
       method: "POST",
       body: JSON.stringify({ selectedSentence }),
@@ -46,16 +61,24 @@ const Home = () => {
 
     const data = await result?.json();
 
+    if (!result.ok) {
+      handleClick();
+    }
+
     setAudioUrl(data?.clipUrl);
-    setLoading(false)
+    setLoading(false);
   };
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-gray-100">
+      <Snackbar
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        open={error}
+        autoHideDuration={3000}
+        onClose={handleClose}
+        message="An error has occured, please try again"
+      />
       <div className="flex flex-col space-y-4">
-        {audioUrl && (
-          <audio ref={audioRef} src={audioUrl} className="hidden" controls />
-        )}
         <p className="text-black text-center">Jingle song generator</p>
         {sentences.length === 0 && (
           <>
@@ -121,12 +144,25 @@ const Home = () => {
                 <CircularProgress />
               </div>
             ) : (
-              <button
-                onClick={() => generateSong()}
-                className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
-              >
-                Generate song
-              </button>
+              <>
+                <button
+                  onClick={() => generateSong()}
+                  className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+                >
+                  Generate song
+                </button>
+
+                {audioUrl && (
+                  <div className="flex justify-center items-center">
+                    <audio
+                      ref={audioRef}
+                      src={audioUrl}
+                      className={audioUrl ? "" : "hidden"}
+                      controls
+                    />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

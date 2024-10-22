@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   let connection: Queue | null = null;
 
   const redisHost = process.env.REDIS_HOSTNAME;
-    const redisPassword = process.env.REDIS_PASSWORD;
+  const redisPassword = process.env.REDIS_PASSWORD;
 
   const convertPhoneticArray = (input: string) => {
     const phonemes = input
@@ -56,9 +56,16 @@ export async function POST(request: NextRequest) {
     const MAX_RETRIES = 5;
 
     // Si hay menos de 6 o mas de 8 elementos, intentamos hasta 5 veces que chatgpt las combine o las divida
-    while ((fixedOutput.length < 6 || fixedOutput.length > 8) && retryCount < MAX_RETRIES) {
-      console.log(`Retry ${retryCount + 1} of ${MAX_RETRIES}: Output length is ${fixedOutput.length}`);
-      
+    while (
+      (fixedOutput.length < 6 || fixedOutput.length > 8) &&
+      retryCount < MAX_RETRIES
+    ) {
+      console.log(
+        `Retry ${retryCount + 1} of ${MAX_RETRIES}: Output length is ${
+          fixedOutput.length
+        }`
+      );
+
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         {
           role: "system",
@@ -78,8 +85,11 @@ export async function POST(request: NextRequest) {
 
       const chatgptOutput: any = completion.choices[0].message.content;
       fixedOutput = convertPhoneticArray(chatgptOutput);
-      console.log(`After retry ${retryCount + 1}: Length ${fixedOutput.length}`, fixedOutput);
-      
+      console.log(
+        `After retry ${retryCount + 1}: Length ${fixedOutput.length}`,
+        fixedOutput
+      );
+
       retryCount++;
     }
 
@@ -88,8 +98,10 @@ export async function POST(request: NextRequest) {
     }
 
     // si hay 7 o 8 elementos y el ultimo es una letra sola, la combina con el anterior
-    if ((fixedOutput.length === 7 || fixedOutput.length === 8) && 
-        fixedOutput[fixedOutput.length - 1].trim().length === 1) {
+    if (
+      (fixedOutput.length === 7 || fixedOutput.length === 8) &&
+      fixedOutput[fixedOutput.length - 1].trim().length === 1
+    ) {
       console.log("Combining last single letter with previous element");
       const lastLetter = fixedOutput.pop()!;
       const previousElement = fixedOutput.pop()!;
