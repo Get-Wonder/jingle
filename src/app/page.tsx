@@ -1,18 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import CircularProgress from "@mui/material/CircularProgress";
 
 const Home = () => {
   const [text, setText] = useState<string>("");
   const [sentences, setSentences] = useState<string[]>([]);
   const [selectedSentence, setSelectedSentence] = useState<string>("");
-  const [syllables, setSyllables] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.play().catch((error) => {
+        console.error("Error playing audio:", error);
+      });
+    }
+  }, [audioUrl]);
 
   const onSubmit = async () => {
     setLoading(true);
-    console.log("ON SUBMIT");
     const result = await fetch("/api/lyrics", {
       method: "POST",
       body: JSON.stringify({ text }),
@@ -29,7 +38,7 @@ const Home = () => {
   };
 
   const generateSong = async () => {
-    console.log("ON GENERATE");
+    setLoading(true)
     const result = await fetch("/api/generate", {
       method: "POST",
       body: JSON.stringify({ selectedSentence }),
@@ -37,12 +46,17 @@ const Home = () => {
 
     const data = await result?.json();
 
-    setSyllables(data);
+    setAudioUrl(data?.clipUrl);
+    setLoading(false)
   };
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-gray-100">
       <div className="flex flex-col space-y-4">
+        {audioUrl && (
+          <audio ref={audioRef} src={audioUrl} className="hidden" controls />
+        )}
+        <p className="text-black text-center">Jingle song generator</p>
         {sentences.length === 0 && (
           <>
             <input
@@ -102,12 +116,18 @@ const Home = () => {
                 You selected: <strong>{selectedSentence}</strong>
               </p>
             </div>
-            <button
-              onClick={() => generateSong()}
-              className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
-            >
-              Generate song
-            </button>
+            {loading ? (
+              <div className="flex justify-center w-full">
+                <CircularProgress />
+              </div>
+            ) : (
+              <button
+                onClick={() => generateSong()}
+                className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+              >
+                Generate song
+              </button>
+            )}
           </>
         )}
         {sentences.length > 0 && (
@@ -116,15 +136,13 @@ const Home = () => {
               setSelectedSentence("");
               setSentences([]);
               setText("");
-              setSyllables("");
+              setAudioUrl("");
             }}
             className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
           >
             Go back
           </button>
         )}
-
-        <p className="text-black mt-6">{syllables}</p>
       </div>
     </div>
   );

@@ -24,19 +24,17 @@ export async function POST(request: NextRequest) {
       model: "gpt-4o",
     });
 
-    const result: any = await JSON.parse(completion.choices[0].message.content);
+    const result: any = await JSON.parse(completion.choices[0].message.content)
     const examplesOfSevenSyllables: any = [];
     console.log("result", result);
     if (result?.length > 0) {
       console.log("adentro if");
       result.forEach((element: any) => {
         console.log("FOR EACH", element);
-        console.log("element?.syllables.length", element?.syllables.length);
+        console.log('element?.syllables.length', element?.syllables.length)
         if (
           examplesOfSevenSyllables.length < 3 &&
-          (element?.syllables.length === 7 ||
-            element?.syllables.length === 6 ||
-            element?.syllables.length === 8)
+          (element?.syllables.length === 7 || element?.syllables.length === 6 || element?.syllables.length === 8)
         ) {
           console.log("HAY MENOS DE 3 Y LA SILABA TIENE MAS DE 6 DE LENGHT");
           examplesOfSevenSyllables.push(element?.text);
