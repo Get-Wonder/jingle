@@ -2,6 +2,7 @@
 import { Queue } from "bullmq";
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
+import crypto from "crypto";
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -12,6 +13,12 @@ export async function POST(request: NextRequest) {
   const redisHost = process.env.REDIS_HOSTNAME;
   const redisPassword = process.env.REDIS_PASSWORD;
 
+  const SALT = process.env.SALT;
+
+  const addSalt = (text: string) => {
+    return text + SALT;
+  };
+
   const convertPhoneticArray = (input: string) => {
     const phonemes = input
       .replace(/[\[\]]/g, "")
@@ -21,9 +28,40 @@ export async function POST(request: NextRequest) {
     return phonemes;
   };
 
+  const validateMD5 = (text: string, hash: string) => {
+    if (!text || !hash) {
+      return false;
+    }
+
+    const textWithSalt = addSalt(text);
+    const calculatedHash = crypto
+      .createHash("md5")
+      .update(textWithSalt)
+      .digest("hex");
+    return calculatedHash === hash;
+  };
+
   try {
-    const { selectedSentence }: { selectedSentence: string } =
+    const {
+      selectedSentence,
+    }: { selectedSentence: { text: string; hash: string } } =
       await request.json();
+
+    const hashAreEqual = validateMD5(
+      selectedSentence?.text,
+      selectedSentence?.hash
+    );
+
+    if (!hashAreEqual) {
+      return NextResponse.json(
+        {
+          error:
+            "The text provided does not match any of the text originally generated",
+          success: false,
+        },
+        { status: 400 }
+      );
+    }
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
@@ -31,7 +69,7 @@ export async function POST(request: NextRequest) {
         content:
           "Generate the phonetic transcription of the given sentence using the following rules: Break down each word into its phonetic components (syllables). Represent each syllable using the ARPAbet phonetic alphabet. Enclose the entire transcription in square brackets [ ]. Separate each syllables phonetic representation with commas. Use spaces between words in the original sentence to separate their phonetic representations. Do not include punctuation marks in the phonetic transcription. For example, given the sentence 'The sun is shining bright today', the output should be: [dh ah, s ah n, ih z, sh ay n, ih ng, b r ay t, t ah, d ey], Each phonetic symbol represents a specific sound: Vowels: ah, iy, uw, eh, ih, ey, ae, ay, aw, ao, oy ,Consonants: b, d, f, g, h, j, k, l, m, n, p, r, s, t, v, w, y, z ,Special sounds: ng, th, dh, ch, jh, sh, zh ,Provide the phonetic transcription for the given sentence following these rules. Pay special attention to phonemes, particularly distinguishing sounds like 'zh' (as in 'genre') and 'jh' (as in 'judge'). The text is the following:",
       },
-      { role: "user", content: selectedSentence },
+      { role: "user", content: selectedSentence?.text },
     ];
 
     const completion = await openai.chat.completions.create({
@@ -94,10 +132,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (fixedOutput.length < 6 || fixedOutput.length > 8) {
-        return NextResponse.json(
-            { error: "An error has occurred, please try again" },
-            { status: 500 }
-          );
+      return NextResponse.json(
+        { error: "An error has occurred, please try again", success: false },
+        { status: 500 }
+      );
     }
 
     // si hay 7 o 8 elementos y el ultimo es una letra sola, la combina con el anterior
@@ -136,9 +174,9 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error("Error obteniendo trabajos completados:", error);
         return NextResponse.json(
-            { error: "An error has occurred, please try again" },
-            { status: 500 }
-          );
+          { error: "An error has occurred, please try again", success: false },
+          { status: 500 }
+        );
       }
     };
 
@@ -154,9 +192,9 @@ export async function POST(request: NextRequest) {
 
       if (tries >= MAX_TRIES) {
         return NextResponse.json(
-            { error: "connection timeout" },
-            { status: 408 }
-          );
+          { error: "connection timeout", success: false },
+          { status: 408 }
+        );
       }
 
       return audioUrl;

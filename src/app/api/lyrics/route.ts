@@ -1,16 +1,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
+import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
+
+  const SALT = process.env.SALT
+
+  const addSalt = (text: string) => {
+    return text + SALT;
+  }
+
+  const createMD5 = (text: string) => {
+    const textWithSalt = addSalt(text);
+    return crypto.createHash('md5').update(textWithSalt).digest('hex');
+  }
 
   try {
     const { text }: { text: string } = await request.json();
 
     if(text.length > 300) {
         return NextResponse.json(
-            { error: "The text must contain less than 300 characters" },
+            { error: "The text must contain less than 300 characters", success: false },
             { status: 400 }
           );
     }
@@ -33,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     if(result?.error) {
         return NextResponse.json(
-            { error: "Forbidden input"},
+            { error: "Forbidden input", success: false},
             { status: 400 }
           );
     }
@@ -50,7 +62,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, data: [...examplesOfSevenSyllables] }, {
+    const resultadosConHash = examplesOfSevenSyllables.map((text: string) => ({
+        text,
+        hash: createMD5(text)
+      }));
+
+    return NextResponse.json({ success: true, data: [...resultadosConHash] }, {
       status: 201,
     });
   } catch (e) {

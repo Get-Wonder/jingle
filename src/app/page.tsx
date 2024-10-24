@@ -7,8 +7,13 @@ import Snackbar from "@mui/material/Snackbar";
 
 const Home = () => {
   const [text, setText] = useState<string>("");
-  const [sentences, setSentences] = useState<string[]>([]);
-  const [selectedSentence, setSelectedSentence] = useState<string>("");
+  const [sentences, setSentences] = useState<{ text: string; hash: string }[]>(
+    []
+  );
+  const [selectedSentence, setSelectedSentence] = useState<{
+    text: string;
+    hash: string;
+  }>({ text: "", hash: "" });
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
@@ -47,14 +52,14 @@ const Home = () => {
     if (data?.error === "Forbidden input") {
       handleClick();
       setLoading(false);
-      return
+      return;
     }
 
     setSentences(data?.data);
     setLoading(false);
   };
 
-  const onSentenceSelect = (sentence: string) => {
+  const onSentenceSelect = (sentence: any) => {
     setSelectedSentence(sentence);
   };
 
@@ -121,28 +126,31 @@ const Home = () => {
             <p className="text-black mb-4">Select one of the following:</p>
             <ul className="space-y-2">
               {sentences.map((sentence) => (
-                <li key={sentence} className="flex items-center space-x-2">
+                <li
+                  key={sentence?.text}
+                  className="flex items-center space-x-2"
+                >
                   <input
                     type="radio"
-                    id={sentence}
+                    id={sentence?.text}
                     name="sentence"
-                    value={sentence}
-                    checked={selectedSentence === sentence}
+                    value={sentence?.text}
+                    checked={selectedSentence?.text === sentence?.text}
                     onChange={() => onSentenceSelect(sentence)}
                   />
-                  <label htmlFor={sentence} className="text-gray-800">
-                    {sentence}
+                  <label htmlFor={sentence?.text} className="text-gray-800">
+                    {sentence?.text}
                   </label>
                 </li>
               ))}
             </ul>
           </div>
         )}
-        {selectedSentence !== "" && (
+        {selectedSentence?.text !== "" && (
           <>
             <div className="mt-4 p-4 bg-green-100 rounded-lg">
               <p className="text-black">
-                You selected: <strong>{selectedSentence}</strong>
+                You selected: <strong>{selectedSentence?.text}</strong>
               </p>
             </div>
             {loading ? (
@@ -175,7 +183,7 @@ const Home = () => {
         {sentences.length > 0 && (
           <button
             onClick={() => {
-              setSelectedSentence("");
+              setSelectedSentence({text: "", hash: ""});
               setSentences([]);
               setText("");
               setAudioUrl("");
