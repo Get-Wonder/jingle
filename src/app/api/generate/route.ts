@@ -202,8 +202,6 @@ export async function POST(request: NextRequest) {
 
     const audioUrl = await waitForCompletion();
 
-    console.log("TENEMOS CLIP URL", audioUrl);
-
     return NextResponse.json({ success: true, audioUrl }, { status: 201 });
   } catch (e) {
     const error = e instanceof Error ? e.message : "An error has occurred";

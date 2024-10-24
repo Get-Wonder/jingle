@@ -20,6 +20,16 @@ export async function POST(request: NextRequest) {
   try {
     const { text }: { text: string } = await request.json();
 
+    if (text === "") {
+      return NextResponse.json(
+        {
+          error: "The text cannot be empty",
+          success: false,
+        },
+        { status: 400 }
+      );
+    }
+
     if (text !== "" && text.length > 300) {
       return NextResponse.json(
         {
