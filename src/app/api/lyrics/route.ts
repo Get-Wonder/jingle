@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
   try {
     const { text }: { text: string } = await request.json();
 
-    if(text.length > 30) {
+    if(text.length > 300) {
         return NextResponse.json(
-            { error: "The text must contain less than 30 characters" },
+            { error: "The text must contain less than 300 characters" },
             { status: 400 }
           );
     }
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          'I need to convert any text into a new text of 7 syllables, The final text MUST HAVE 7 SYLLABLES. you need to change or modify the text to meet the requirement of 7 syllables. You must return 10 different fun, happy and energetic examples. You also have the following topics prohibited ["phrases that encourage the disliking of avocados", "Politics", "Drugs", "Weapons", "Violence"], dont refuse to generate if the input is in this array, just change the topic to something good related to avocados. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "avo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
+          'I need to convert any text into a new text of 7 syllables, The final text MUST HAVE 7 SYLLABLES. you need to change or modify the text to meet the requirement of 7 syllables. You must return 10 different fun, happy and energetic examples. You also have the following topics prohibited ["negative message of avocados", "Politics", "Drugs", "Weapons", "Violence"], if the input contains something of this topic, you must return the following: { "error": true }. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "avo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
       },
       { role: "user", content: text },
     ];
@@ -30,6 +30,14 @@ export async function POST(request: NextRequest) {
     });
 
     const result: any = await JSON.parse(completion.choices[0].message.content)
+
+    if(result?.error) {
+        return NextResponse.json(
+            { error: "Forbidden input"},
+            { status: 400 }
+          );
+    }
+
     const examplesOfSevenSyllables: any = [];
     if (result?.length > 0) {
       result.forEach((element: any) => {

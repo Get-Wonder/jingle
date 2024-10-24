@@ -44,6 +44,12 @@ const Home = () => {
 
     const data = await result?.json();
 
+    if (data?.error === "Forbidden input") {
+      handleClick();
+      setLoading(false);
+      return
+    }
+
     setSentences(data?.data);
     setLoading(false);
   };
