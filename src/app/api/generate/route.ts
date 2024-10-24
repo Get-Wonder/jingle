@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (fixedOutput.length < 6 || fixedOutput.length > 8) {
-      throw new Error("Cantidad incorrecta de silabas después de 5 intentos");
+        return NextResponse.json(
+            { error: "An error has occurred, please try again" },
+            { status: 500 }
+          );
     }
 
     // si hay 7 o 8 elementos y el ultimo es una letra sola, la combina con el anterior
@@ -102,11 +105,9 @@ export async function POST(request: NextRequest) {
       (fixedOutput.length === 7 || fixedOutput.length === 8) &&
       fixedOutput[fixedOutput.length - 1].trim().length === 1
     ) {
-      console.log("Combining last single letter with previous element");
       const lastLetter = fixedOutput.pop()!;
       const previousElement = fixedOutput.pop()!;
       fixedOutput.push(`${previousElement}${lastLetter}`);
-      console.log("After combining:", fixedOutput, fixedOutput.length);
     }
 
     const job = await connection.add("generate", { text: fixedOutput });
@@ -122,44 +123,50 @@ export async function POST(request: NextRequest) {
           const completedJob = completedJobs.find((j) => j.id === job.id);
 
           if (completedJob) {
-            const clipUrl = completedJob.returnvalue.clipUrl;
-            console.log("Clip URL:", clipUrl);
+            const audioUrl = completedJob.returnvalue.clipUrl;
+            console.log("Clip URL:", audioUrl);
 
             await connection.clean(0, 500, "completed");
 
-            return clipUrl;
+            return audioUrl;
           }
 
           return null;
         }
       } catch (error) {
         console.error("Error obteniendo trabajos completados:", error);
-        return null;
+        return NextResponse.json(
+            { error: "An error has occurred, please try again" },
+            { status: 500 }
+          );
       }
     };
 
     const waitForCompletion = async () => {
-      let clipUrl = null;
-      while (!clipUrl && tries < MAX_TRIES) {
+      let audioUrl = null;
+      while (!audioUrl && tries < MAX_TRIES) {
         console.log(`Intento ${tries} de ${MAX_TRIES}...`);
-        clipUrl = await checkJobCompletion();
-        if (!clipUrl) {
+        audioUrl = await checkJobCompletion();
+        if (!audioUrl) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
 
       if (tries >= MAX_TRIES) {
-        throw new Error("Maximum number of tries exceeded");
+        return NextResponse.json(
+            { error: "connection timeout" },
+            { status: 408 }
+          );
       }
 
-      return clipUrl;
+      return audioUrl;
     };
 
-    const clipUrl = await waitForCompletion();
+    const audioUrl = await waitForCompletion();
 
-    console.log("TENEMOS CLIP URL", clipUrl);
+    console.log("TENEMOS CLIP URL", audioUrl);
 
-    return NextResponse.json({ clipUrl }, { status: 201 });
+    return NextResponse.json({ success: true, audioUrl }, { status: 201 });
   } catch (e) {
     const error = e instanceof Error ? e.message : "An error has occurred";
     const status =

@@ -44,7 +44,7 @@ const Home = () => {
 
     const data = await result?.json();
 
-    setSentences(data);
+    setSentences(data?.data);
     setLoading(false);
   };
 
@@ -65,7 +65,7 @@ const Home = () => {
       handleClick();
     }
 
-    setAudioUrl(data?.clipUrl);
+    setAudioUrl(data?.audioUrl);
     setLoading(false);
   };
 
