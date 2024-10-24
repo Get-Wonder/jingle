@@ -1,30 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
-import crypto from 'crypto';
+import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
-  const SALT = process.env.SALT
+  const SALT = process.env.SALT;
 
   const addSalt = (text: string) => {
     return text + SALT;
-  }
+  };
 
   const createMD5 = (text: string) => {
     const textWithSalt = addSalt(text);
-    return crypto.createHash('md5').update(textWithSalt).digest('hex');
-  }
+    return crypto.createHash("md5").update(textWithSalt).digest("hex");
+  };
 
   try {
     const { text }: { text: string } = await request.json();
 
-    if(text.length > 300) {
-        return NextResponse.json(
-            { error: "The text must contain less than 300 characters", success: false },
-            { status: 400 }
-          );
+    if (text !== "" && text.length > 300) {
+      return NextResponse.json(
+        {
+          error: "The text must contain less than 300 characters",
+          success: false,
+        },
+        { status: 400 }
+      );
     }
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -41,13 +44,13 @@ export async function POST(request: NextRequest) {
       model: "gpt-4o",
     });
 
-    const result: any = await JSON.parse(completion.choices[0].message.content)
+    const result: any = await JSON.parse(completion.choices[0].message.content);
 
-    if(result?.error) {
-        return NextResponse.json(
-            { error: "Forbidden input", success: false},
-            { status: 400 }
-          );
+    if (result?.error) {
+      return NextResponse.json(
+        { error: "Forbidden input", success: false },
+        { status: 400 }
+      );
     }
 
     const examplesOfSevenSyllables: any = [];
@@ -55,25 +58,37 @@ export async function POST(request: NextRequest) {
       result.forEach((element: any) => {
         if (
           examplesOfSevenSyllables.length < 3 &&
-          (element?.syllables.length === 7 || element?.syllables.length === 6 || element?.syllables.length === 8)
+          (element?.syllables.length === 7 ||
+            element?.syllables.length === 6 ||
+            element?.syllables.length === 8)
         ) {
           examplesOfSevenSyllables.push(element?.text);
         }
       });
     }
 
-    const resultadosConHash = examplesOfSevenSyllables.map((text: string) => ({
-        text,
-        hash: createMD5(text)
-      }));
+    if (examplesOfSevenSyllables?.length === 0) {
+      return NextResponse.json(
+        { error: "An error has occurred, please try again" },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ success: true, data: [...resultadosConHash] }, {
-      status: 201,
-    });
-  } catch (e) {
-    console.log('error in lyrics', e)
+    const resultadosConHash = examplesOfSevenSyllables.map((text: string) => ({
+      text,
+      hash: createMD5(text),
+    }));
+
     return NextResponse.json(
-      { error: "An error has occurred, please try again"},
+      { success: true, data: [...resultadosConHash] },
+      {
+        status: 201,
+      }
+    );
+  } catch (e) {
+    console.log("error in lyrics", e);
+    return NextResponse.json(
+      { error: "An error has occurred, please try again" },
       { status: 500 }
     );
   }
