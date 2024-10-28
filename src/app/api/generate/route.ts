@@ -23,8 +23,9 @@ export async function POST(request: NextRequest) {
     const phonemes = input
       .replace(/[\[\]]/g, "")
       .split(",")
-      .map((s) => s.trim());
-
+      .map((s) => s.trim())
+      .map(s => s.replace(/['"]/g, ""));
+    
     return phonemes;
   };
 
@@ -67,17 +68,18 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          "Generate the phonetic transcription of the given sentence using the following rules: Break down each word into its phonetic components (syllables). Represent each syllable using the ARPAbet phonetic alphabet. Enclose the entire transcription in square brackets [ ]. Separate each syllables phonetic representation with commas. Use spaces between words in the original sentence to separate their phonetic representations. Do not include punctuation marks in the phonetic transcription. For example, given the sentence 'The sun is shining bright today', the output should be: [dh ah, s ah n, ih z, sh ay n, ih ng, b r ay t, t ah, d ey], Each phonetic symbol represents a specific sound: Vowels: ah, iy, uw, eh, ih, ey, ae, ay, aw, ao, oy ,Consonants: b, d, f, g, h, j, k, l, m, n, p, r, s, t, v, w, y, z ,Special sounds: ng, th, dh, ch, jh, sh, zh ,Provide the phonetic transcription for the given sentence following these rules. Pay special attention to phonemes, particularly distinguishing sounds like 'zh' (as in 'genre') and 'jh' (as in 'judge'). The text is the following:",
+          "Separate the following text in syllables. Separate each syllable with commas. For example, given the sentence 'The sun is shining bright today', the output should be: ['the', 'sun', 'is', 'shi', 'ning', 'bright', 'to', 'day']. The text is the following:",
       },
       { role: "user", content: selectedSentence?.text },
     ];
 
     const completion = await openai.chat.completions.create({
       messages,
-      model: "gpt-4",
+      model: "gpt-4o",
     });
 
     const result: any = completion.choices[0].message.content;
+
 
     connection = new Queue("jingle-queue", {
       connection: {
@@ -87,8 +89,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    let fixedOutput = convertPhoneticArray(result);
-    console.log("fixedOutput", fixedOutput, fixedOutput.length);
+    let fixedOutput = convertPhoneticArray(result)
 
     let retryCount = 0;
     const MAX_RETRIES = 5;
@@ -109,8 +110,8 @@ export async function POST(request: NextRequest) {
           role: "system",
           content: `The next text is using the ARPAbet phonetic alphabet, Your task is ${
             fixedOutput.length < 6
-              ? "to separate two of those phonemes, try to separate the ones that are from the same word"
-              : "to combine two of those phonemes, try to combine the ones that are from the same word"
+              ? "to separate two of those syllables, try to separate the ones that are from the same word"
+              : "to combine two of those syllables, try to combine the ones that are from the same word"
           }, return in the same structure as the input: ${fixedOutput}. `,
         },
         { role: "user", content: `${fixedOutput}` },
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
 
       const chatgptOutput: any = completion.choices[0].message.content;
       fixedOutput = convertPhoneticArray(chatgptOutput);
+
       console.log(
         `After retry ${retryCount + 1}: Length ${fixedOutput.length}`,
         fixedOutput
@@ -148,7 +150,7 @@ export async function POST(request: NextRequest) {
       fixedOutput.push(`${previousElement}${lastLetter}`);
     }
 
-    const job = await connection.add("generate", { text: fixedOutput });
+    const job = await connection.add("generate", { text: selectedSentence?.text, count: fixedOutput.length });
 
     let tries = 0;
     const MAX_TRIES = 15;
@@ -161,6 +163,16 @@ export async function POST(request: NextRequest) {
           const completedJob = completedJobs.find((j) => j.id === job.id);
 
           if (completedJob) {
+            if (completedJob.returnvalue?.error) {
+              return NextResponse.json(
+                {
+                  error: "An error has occurred, please try again",
+                  success: false,
+                },
+                { status: 500 }
+              );
+            }
+
             const audioUrl = completedJob.returnvalue.clipUrl;
             console.log("Clip URL:", audioUrl);
 
