@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
 
   const SALT = process.env.SALT;
 
+  const forbiddenWords = ["monarch", "butterflies", "worker", "immigration"];
+
   const addSalt = (text: string) => {
     return text + SALT;
   };
@@ -44,40 +46,46 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          'I need to convert any text into a new text of 7 syllables, The final text MUST HAVE 7 SYLLABLES. you need to change or modify the text to meet the requirement of 7 syllables. You must return 10 different fun, happy and energetic examples. You also have the following topics prohibited ["negative message of avocados", "Politics", "Drugs", "Weapons", "Violence"], if the input contains something of this topic, you must return the following: { "error": true }. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "avo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
+          'I need to convert any text into a new text of 8 syllables, The final text MUST HAVE 8 SYLLABLES. you need to change or modify the text to meet the requirement of 8 syllables. You must return 15 different Fun, cherful and lighthearded examples. You also have the following topics prohibited ["negative message of avocados", "Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"], if the input contains something of this topic, you must return the following: { "error": true }. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "a", "vo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
       },
       { role: "user", content: text },
     ];
 
-    const completion: any = await openai.chat.completions.create({
-      messages,
-      model: "gpt-4o",
-    });
-
-    const result: any = await JSON.parse(completion.choices[0].message.content);
-
-    if (result?.error) {
-      return NextResponse.json(
-        { error: "Forbidden input", success: false },
-        { status: 400 }
-      );
-    }
-
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
     const examplesOfSevenSyllables: any = [];
-    if (result?.length > 0) {
-      result.forEach((element: any) => {
-        if (
-          examplesOfSevenSyllables.length < 3 &&
-          (element?.syllables.length === 7 ||
-            element?.syllables.length === 6 ||
-            element?.syllables.length === 8)
-        ) {
-          examplesOfSevenSyllables.push(element?.text);
-        }
+
+    while (retryCount < MAX_RETRIES && examplesOfSevenSyllables.length < 3) {
+      console.log("TRY NUMBER", retryCount + 1)
+      const completion: any = await openai.chat.completions.create({
+        messages,
+        model: "gpt-4o",
       });
+
+      const result: any = await JSON.parse(completion.choices[0].message.content);
+
+      if (result?.error) {
+        return NextResponse.json(
+          { error: "Forbidden input", success: false },
+          { status: 400 }
+        );
+      }
+
+      if (result?.length > 0) {
+        result.forEach((element: any) => {
+          if (
+            examplesOfSevenSyllables.length < 3 &&
+            element?.syllables.length === 8
+          ) {
+            examplesOfSevenSyllables.push(element?.text);
+          }
+        });
+      }
+
+      retryCount++;
     }
 
-    if (examplesOfSevenSyllables?.length === 0) {
+    if (examplesOfSevenSyllables.length === 0) {
       return NextResponse.json(
         { error: "An error has occurred, please try again" },
         { status: 500 }
@@ -88,6 +96,20 @@ export async function POST(request: NextRequest) {
       text,
       hash: createMD5(text),
     }));
+
+    forbiddenWords.forEach((word: string) => {
+      if (
+        resultadosConHash.some(
+          (result: { text: string; hash: string }) =>
+            result?.text.includes(word)
+        )
+      ) {
+        return NextResponse.json(
+          { error: "Forbidden input" },
+          { status: 500 }
+        );
+      }
+    });
 
     return NextResponse.json(
       { success: true, data: [...resultadosConHash] },

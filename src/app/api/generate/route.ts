@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
   const redisHost = process.env.REDIS_HOSTNAME;
   const redisPassword = process.env.REDIS_PASSWORD;
 
+
   const SALT = process.env.SALT;
 
   const addSalt = (text: string) => {
@@ -94,9 +95,9 @@ export async function POST(request: NextRequest) {
     let retryCount = 0;
     const MAX_RETRIES = 5;
 
-    // Si hay menos de 6 o mas de 8 elementos, intentamos hasta 5 veces que chatgpt las combine o las divida
+    // Si hay menos de 8 o mas de 8 elementos, intentamos hasta 5 veces que chatgpt las combine o las divida
     while (
-      (fixedOutput.length < 6 || fixedOutput.length > 8) &&
+      (fixedOutput.length < 8 || fixedOutput.length > 8) &&
       retryCount < MAX_RETRIES
     ) {
       console.log(
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
         {
           role: "system",
           content: `The next text is using the ARPAbet phonetic alphabet, Your task is ${
-            fixedOutput.length < 6
+            fixedOutput.length < 8
               ? "to separate two of those syllables, try to separate the ones that are from the same word"
               : "to combine two of those syllables, try to combine the ones that are from the same word"
           }, return in the same structure as the input: ${fixedOutput}. `,
