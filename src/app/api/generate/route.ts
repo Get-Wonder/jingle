@@ -1,33 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Queue } from "bullmq";
+import { queueConnection } from '@/app/lib/redis';
 import { NextRequest, NextResponse } from "next/server";
-import { OpenAI } from "openai";
 import crypto from "crypto";
 import * as dotenv from "dotenv";
 dotenv.config();
 
 export async function POST(request: NextRequest) {
-  const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
-  let connection: Queue | null = null;
-
-  const redisHost = process.env.REDIS_HOSTNAME;
-  const redisPassword = process.env.REDIS_PASSWORD;
-
-
   const SALT = process.env.SALT;
+  const bucketName = process.env.DO_BUCKET
 
   const addSalt = (text: string) => {
     return text + SALT;
   };
 
-  const convertPhoneticArray = (input: string) => {
-    const phonemes = input
-      .replace(/[\[\]]/g, "")
-      .split(",")
-      .map((s) => s.trim())
-      .map(s => s.replace(/['"]/g, ""));
-    
-    return phonemes;
+  const createMD5 = (text: string) => {
+    const textWithSalt = addSalt(text);
+    return crypto.createHash("md5").update(textWithSalt).digest("hex");
   };
 
   const validateMD5 = (text: string, hash: string) => {
@@ -41,6 +29,23 @@ export async function POST(request: NextRequest) {
       .update(textWithSalt)
       .digest("hex");
     return calculatedHash === hash;
+  };
+
+  const checkFileExists = async (text: string) => {
+    try {
+        const hash = createMD5(text)
+        const audioUrl = `https://${bucketName}.ams3.digitaloceanspaces.com/jingle/clips/${hash}.mp3`
+        console.log('CHECK IF URL EXISTS', audioUrl)
+      const response = await fetch(
+        audioUrl,
+        { method: "HEAD" }
+      );
+      return { success: response.ok, audioUrl };
+    } catch (e) {
+        console.log('e', e)
+      return { success: false }
+
+    }
   };
 
   try {
@@ -64,94 +69,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    const alreadyExists = await checkFileExists(selectedSentence?.text)
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content:
-          "Separate the following text in syllables. Separate each syllable with commas. For example, given the sentence 'The sun is shining bright today', the output should be: ['the', 'sun', 'is', 'shi', 'ning', 'bright', 'to', 'day']. The text is the following:",
-      },
-      { role: "user", content: selectedSentence?.text },
-    ];
-
-    const completion = await openai.chat.completions.create({
-      messages,
-      model: "gpt-4o",
-    });
-
-    const result: any = completion.choices[0].message.content;
-
-
-    connection = new Queue("jingle-queue", {
-      connection: {
-        host: redisHost,
-        port: 6379,
-        password: redisPassword,
-      },
-    });
-
-    let fixedOutput = convertPhoneticArray(result)
-
-    let retryCount = 0;
-    const MAX_RETRIES = 5;
-
-    // Si hay menos de 8 o mas de 8 elementos, intentamos hasta 5 veces que chatgpt las combine o las divida
-    while (
-      (fixedOutput.length < 8 || fixedOutput.length > 8) &&
-      retryCount < MAX_RETRIES
-    ) {
-      console.log(
-        `Retry ${retryCount + 1} of ${MAX_RETRIES}: Output length is ${
-          fixedOutput.length
-        }`
-      );
-
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        {
-          role: "system",
-          content: `The next text is using the ARPAbet phonetic alphabet, Your task is ${
-            fixedOutput.length < 8
-              ? "to separate two of those syllables, try to separate the ones that are from the same word"
-              : "to combine two of those syllables, try to combine the ones that are from the same word"
-          }, return in the same structure as the input: ${fixedOutput}. `,
-        },
-        { role: "user", content: `${fixedOutput}` },
-      ];
-
-      const completion = await openai.chat.completions.create({
-        messages,
-        model: "gpt-4",
-      });
-
-      const chatgptOutput: any = completion.choices[0].message.content;
-      fixedOutput = convertPhoneticArray(chatgptOutput);
-
-      console.log(
-        `After retry ${retryCount + 1}: Length ${fixedOutput.length}`,
-        fixedOutput
-      );
-
-      retryCount++;
+    if(alreadyExists?.success) {
+        return NextResponse.json(
+            { success: true, audioUrl: alreadyExists?.audioUrl, text: selectedSentence?.text },
+            { status: 201 }
+          );
     }
 
-    if (fixedOutput.length < 6 || fixedOutput.length > 8) {
-      return NextResponse.json(
-        { error: "An error has occurred, please try again", success: false },
-        { status: 500 }
-      );
-    }
-
-    // si hay 7 o 8 elementos y el ultimo es una letra sola, la combina con el anterior
-    if (
-      (fixedOutput.length === 7 || fixedOutput.length === 8) &&
-      fixedOutput[fixedOutput.length - 1].trim().length === 1
-    ) {
-      const lastLetter = fixedOutput.pop()!;
-      const previousElement = fixedOutput.pop()!;
-      fixedOutput.push(`${previousElement}${lastLetter}`);
-    }
-
-    const job = await connection.add("generate", { text: selectedSentence?.text, count: fixedOutput.length });
+    const job = await queueConnection.add("generate", { text: selectedSentence?.text, count: 8 });
 
     let tries = 0;
     const MAX_TRIES = 15;
@@ -159,8 +87,8 @@ export async function POST(request: NextRequest) {
     const checkJobCompletion = async () => {
       tries += 1;
       try {
-        if (connection) {
-          const completedJobs = await connection.getJobs(["completed"]);
+        if (queueConnection) {
+          const completedJobs = await queueConnection.getJobs(["completed"]);
           const completedJob = completedJobs.find((j) => j.id === job.id);
 
           if (completedJob) {
@@ -177,7 +105,7 @@ export async function POST(request: NextRequest) {
             const audioUrl = completedJob.returnvalue.clipUrl;
             console.log("Clip URL:", audioUrl);
 
-            await connection.clean(0, 500, "completed");
+            await queueConnection.clean(0, 500, "completed");
 
             return audioUrl;
           }

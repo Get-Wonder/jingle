@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
 import crypto from "crypto";
+import syllables from 'syllables';
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { text }: { text: string } = await request.json();
+
+    console.log('syllables text', syllables(text))
 
     if (text === "") {
       return NextResponse.json(
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          'I need to convert any text into a new text of 8 syllables, The final text MUST HAVE 8 SYLLABLES. you need to change or modify the text to meet the requirement of 8 syllables. You must return 15 different Fun, cherful and lighthearded examples. You also have the following topics prohibited ["negative message of avocados", "Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"], if the input contains something of this topic, you must return the following: { "error": true }. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "a", "vo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
+          'I need to convert any text into a new text of 8 syllables, you need to change or modify the text to meet the requirement of 8 syllables. You must return 20 different Fun, cherful and lighthearded examples. You also have the following topics prohibited ["negative message of avocados", "Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"], if the input contains something of this topic, you must return the following: { "error": true }. each different from the other in the structure of the following example: UserInput: "I would like to eat some avocados right now" => "Craving avocados here", you must also for each example return the ammount of syllabes it has, in the following format => ["cra", "ving", "a", "vo", "ca", "dos", "he", "re"]. You must return a pair of text and syllables for each of the ten different texts in the following format [{"text": "craving avocados here", "syllables": ["cra", "ving", "avo", "ca", "dos", "he", "re"]}] you must only return the array containing all the examples DO NOT ADD ```json``` around the array, just return the array, each object for example containing text and syllables. Do as the instruction tell for the following example:',
       },
       { role: "user", content: text },
     ];
@@ -73,9 +76,10 @@ export async function POST(request: NextRequest) {
 
       if (result?.length > 0) {
         result.forEach((element: any) => {
+          console.log(element?.text, syllables(element?.text))
           if (
             examplesOfSevenSyllables.length < 3 &&
-            element?.syllables.length === 8
+            syllables(element?.text) === 8
           ) {
             examplesOfSevenSyllables.push(element?.text);
           }
