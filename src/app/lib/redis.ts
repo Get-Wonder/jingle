@@ -9,6 +9,7 @@ const redisHost = process.env.REDIS_HOSTNAME;
 const redisPassword = process.env.REDIS_PASSWORD;
 
 
+
 export const createQueueConnection = () => {
   if (!global.queueConnection) {
     global.queueConnection = new Queue("jingle-queue", {

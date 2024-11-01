@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       console.log("TRY NUMBER", retryCount + 1);
       const completion: any = await openai.chat.completions.create({
         messages,
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
       });
 
       const result: any = await JSON.parse(

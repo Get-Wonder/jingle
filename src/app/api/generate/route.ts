@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const checkFileExists = async (text: string) => {
     try {
         const hash = createMD5(text)
-        const audioUrl = `https://${bucketName}.ams3.digitaloceanspaces.com/jingle/clips/${hash}.mp3`
+        const audioUrl = `https://${bucketName}.nyc3.digitaloceanspaces.com/jingle/clips/${hash}.mp3`
         console.log('CHECK IF URL EXISTS', audioUrl)
       const response = await fetch(
         audioUrl,
