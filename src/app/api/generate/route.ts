@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const job = await queueConnection.add("generate", { text: selectedSentence?.text, count: 8 });
 
     let tries = 0;
-    const MAX_TRIES = 15;
+    const MAX_TRIES = 60;
 
     const checkJobCompletion = async () => {
       tries += 1;
@@ -104,8 +104,6 @@ export async function POST(request: NextRequest) {
 
             const audioUrl = completedJob.returnvalue.clipUrl;
             console.log("Clip URL:", audioUrl);
-
-            await queueConnection.clean(0, 500, "completed");
 
             return audioUrl;
           }
