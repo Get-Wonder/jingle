@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
         return {
           text: example,
-          hash: createMD5(text),
+          hash: createMD5(example),
           isFromUser,
         };
       }
