@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { syllable } from "syllable";
 
 export async function POST(request: NextRequest) {
+  console.time("lyrics-api");
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
   const SALT = process.env.SALT;
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          'Transform the given text into 15 different fun, cheerful, and lighthearted jingles that must be EXACTLY 8 syllable long, suitable for singing over the "Avocados From Mexico" jingle. Use longer phrases with descriptive words to reach exactly 8 syllable. Each jingle should use words with many letters when possible, and be different from each other in structure. Importantly, each jingle should preserve the meaning of the original text as much as possible. Prohibited Words: ["Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"] Important Notes: Only check for the exact words listed in the prohibited words. Do not consider synonyms, related terms, or extended meanings. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Return an array containing 15 objects. Each object should have a "text" key with the jingle as its value. Do not include any additional text or formatting. Example: User Input: "I love Avocados" Output: [ { "text": "Daily dose of avocados" }, { "text": "Hungry for avocados now" }, … ]',
+          'Transform the given text into 15 different fun, cheerful, and lighthearted jingles that must be EXACTLY 8 syllable long, suitable for singing over the "Avocados From Mexico" jingle. Use longer phrases with descriptive words to reach exactly 8 syllable. Each jingle should use words with many letters when possible, and be different from each other in structure. Importantly, each jingle should preserve the meaning of the original text as much as possible. Prohibited Words: ["Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"] Important Notes: Only check for the exact words listed in the prohibited words. Do not consider synonyms, related terms, or extended meanings. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Return an array containing 10 objects. Each object should have a "text" key with the jingle as its value. Do not include any additional text or formatting. Example: User Input: "I love Avocados" Output: [ { "text": "Daily dose of avocados" }, { "text": "Hungry for avocados now" }, … ]',
       },
       { role: "user", content: text },
     ];
@@ -153,5 +154,7 @@ export async function POST(request: NextRequest) {
       { error: "An error has occurred, please try again" },
       { status: 500 }
     );
+  } finally {
+    console.timeEnd("lyrics-api");
   }
 }
