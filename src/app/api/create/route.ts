@@ -6,7 +6,6 @@ import { queueConnection } from "@/app/lib/redis";
 import syllable from "syllable";
 
 export async function POST(request: NextRequest) {
-  const syllables = syllable;
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
   const bucketName = process.env.DO_BUCKET
   const SALT = process.env.SALT;
@@ -96,10 +95,10 @@ export async function POST(request: NextRequest) {
 
       if (result?.length > 0) {
         result.forEach((element: any) => {
-          console.log(element?.text, syllables(element?.text));
+          console.log(element?.text, syllable(element?.text));
           if (
             examplesOfSevenSyllables?.length < 1 &&
-            syllables(element?.text) === 8
+            syllable(element?.text) === 8
           ) {
             examplesOfSevenSyllables.push(element?.text);
           }
