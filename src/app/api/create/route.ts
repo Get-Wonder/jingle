@@ -6,6 +6,7 @@ import { queueConnection } from "@/app/lib/redis";
 import syllable from "syllable";
 
 export async function POST(request: NextRequest) {
+  const syllables = syllable;
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
   const bucketName = process.env.DO_BUCKET
   const SALT = process.env.SALT;
