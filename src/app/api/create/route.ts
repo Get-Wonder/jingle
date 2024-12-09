@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
 import crypto from "crypto";
 import { queueConnection } from "@/app/lib/redis";
-import syllables from "syllables";
+import syllable from "syllable";
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
