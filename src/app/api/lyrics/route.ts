@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
 import crypto from "crypto";
-import syllables from "syllables";
+import { syllable } from "syllable";
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
@@ -60,20 +60,20 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          'Transform the given text into 15 different fun, cheerful, and lighthearted jingles suitable for singing over the "Avocados From Mexico" jingle. Each jingle should vary in length but have at least 5 words, use words with many letters when possible, and be different from each other in structure. Importantly, each jingle should preserve the meaning of the original text as much as possible. Prohibited Words: ["Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"] Important Notes: Only check for the exact words listed in the prohibited words. Do not consider synonyms, related terms, or extended meanings. If the input text contains any of these exact words, then return the following JSON object: { "error": true }.Output Format: Return an array containing 15 objects. Each object should have a "text" key with the jingle as its value. Do not include any additional text or formatting.Example:User Input: "I would like to eat some avocados right now"Output: [ { "text": "Craving avocados here" }, { "text": "Yearning for green delights" }, … ]',
+          'Transform the given text into 15 different fun, cheerful, and lighthearted jingles that must be EXACTLY 8 syllable long, suitable for singing over the "Avocados From Mexico" jingle. Use longer phrases with descriptive words to reach exactly 8 syllable. Each jingle should use words with many letters when possible, and be different from each other in structure. Importantly, each jingle should preserve the meaning of the original text as much as possible. Prohibited Words: ["Politics", "Drugs", "Weapons", "Violence", "Monarchs", "Butterflies", "Workers", "Immigrants"] Important Notes: Only check for the exact words listed in the prohibited words. Do not consider synonyms, related terms, or extended meanings. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Return an array containing 15 objects. Each object should have a "text" key with the jingle as its value. Do not include any additional text or formatting. Example: User Input: "I love Avocados" Output: [ { "text": "Daily dose of avocados" }, { "text": "Hungry for avocados now" }, … ]',
       },
       { role: "user", content: text },
     ];
 
     let retryCount = 0;
     const MAX_RETRIES = 5;
-    const examplesOfSevenSyllables: any = [];
+    const examplesOfSevensyllable: any = [];
 
-    if (syllables(text) === 8) {
-      examplesOfSevenSyllables.push(text);
+    if (syllable(text) === 8) {
+      examplesOfSevensyllable.push(text);
     }
 
-    while (retryCount < MAX_RETRIES && examplesOfSevenSyllables.length < 3) {
+    while (retryCount < MAX_RETRIES && examplesOfSevensyllable.length < 3) {
       console.log("TRY NUMBER", retryCount + 1);
       const completion: any = await openai.chat.completions.create({
         messages,
@@ -101,12 +101,12 @@ export async function POST(request: NextRequest) {
 
       if (result?.length > 0) {
         result.forEach((element: any) => {
-          console.log(element?.text, syllables(element?.text));
+          console.log("Contando", element?.text, syllable(element?.text));
           if (
-            examplesOfSevenSyllables.length < 3 &&
-            syllables(element?.text) === 8
+            examplesOfSevensyllable.length < 3 &&
+            syllable(element?.text) === 8
           ) {
-            examplesOfSevenSyllables.push(element?.text);
+            examplesOfSevensyllable.push(element?.text);
           }
         });
       }
@@ -114,24 +114,22 @@ export async function POST(request: NextRequest) {
       retryCount++;
     }
 
-    if (examplesOfSevenSyllables.length === 0) {
+    if (examplesOfSevensyllable.length === 0) {
       return NextResponse.json(
         { error: "An error has occurred, please try again" },
         { status: 500 }
       );
     }
 
-    const resultadosConHash = examplesOfSevenSyllables.map(
-      (example: string) => {
-        const isFromUser = text === example;
+    const resultadosConHash = examplesOfSevensyllable.map((example: string) => {
+      const isFromUser = text === example;
 
-        return {
-          text: example,
-          hash: createMD5(example),
-          isFromUser,
-        };
-      }
-    );
+      return {
+        text: example,
+        hash: createMD5(example),
+        isFromUser,
+      };
+    });
 
     forbiddenWords.forEach((word: string) => {
       if (
