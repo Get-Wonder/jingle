@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { queueConnection } from '@/app/lib/redis';
+import { queueConnection } from "@/app/lib/redis";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import * as dotenv from "dotenv";
+import { trackJobCompletion } from "@/app/lib/analytics";
 dotenv.config();
 
 export async function POST(request: NextRequest) {
   const SALT = process.env.SALT;
-  const bucketName = process.env.DO_BUCKET
+  const bucketName = process.env.DO_BUCKET;
 
   const addSalt = (text: string) => {
     return text + SALT;
@@ -33,18 +34,14 @@ export async function POST(request: NextRequest) {
 
   const checkFileExists = async (text: string) => {
     try {
-        const hash = createMD5(text)
-        const audioUrl = `https://${bucketName}.nyc3.digitaloceanspaces.com/jingle/clips/${hash}.mp3`
-        console.log('CHECK IF URL EXISTS', audioUrl)
-      const response = await fetch(
-        audioUrl,
-        { method: "HEAD" }
-      );
+      const hash = createMD5(text);
+      const audioUrl = `https://${bucketName}.nyc3.digitaloceanspaces.com/jingle/clips/${hash}.mp3`;
+      console.log("CHECK IF URL EXISTS", audioUrl);
+      const response = await fetch(audioUrl, { method: "HEAD" });
       return { success: response.ok, audioUrl };
     } catch (e) {
-        console.log('e', e)
-      return { success: false }
-
+      console.log("e", e);
+      return { success: false };
     }
   };
 
@@ -69,17 +66,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    const alreadyExists = await checkFileExists(selectedSentence?.text)
 
-    if(alreadyExists?.success) {
-        return NextResponse.json(
-            { success: true, audioUrl: alreadyExists?.audioUrl, text: selectedSentence?.text },
-            { status: 201 }
-          );
+    const alreadyExists = await checkFileExists(selectedSentence?.text);
+
+    if (alreadyExists?.success) {
+      await trackJobCompletion(true, 0);
+      return NextResponse.json(
+        {
+          success: true,
+          audioUrl: alreadyExists?.audioUrl,
+          text: selectedSentence?.text,
+        },
+        { status: 201 }
+      );
     }
 
-    const job = await queueConnection.add("generate", { text: selectedSentence?.text, count: 8 });
+    const startTime = Date.now();
+    const job = await queueConnection.add("generate", {
+      text: selectedSentence?.text,
+      count: 8,
+    });
 
     let tries = 0;
     const MAX_TRIES = 60;
@@ -140,9 +146,20 @@ export async function POST(request: NextRequest) {
     };
 
     const audioUrl = await waitForCompletion();
+    const duration = Date.now() - startTime;
 
-    return NextResponse.json({ success: true, audioUrl }, { status: 201 });
+    if (audioUrl) {
+      await trackJobCompletion(true, duration);
+      return NextResponse.json({ success: true, audioUrl }, { status: 201 });
+    } else {
+      await trackJobCompletion(false, duration);
+      return NextResponse.json(
+        { error: "connection timeout", success: false },
+        { status: 408 }
+      );
+    }
   } catch (e) {
+    await trackJobCompletion(false);
     const error = e instanceof Error ? e.message : "An error has occurred";
     const status =
       e instanceof Error && e.message === "Maximum number of tries exceeded"
