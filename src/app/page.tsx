@@ -1,36 +1,92 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import CircularProgress from "@mui/material/CircularProgress";
-import Snackbar from "@mui/material/Snackbar";
+import { CircularProgress, Snackbar } from "@mui/material";
+
+const defaultForbiddenWords = "";
+const defaultPrompt = "";
 
 const Home = () => {
   const [text, setText] = useState<string>("");
-  const [sentences, setSentences] = useState<{ text: string; hash: string }[]>(
-    []
-  );
-  const [selectedSentence, setSelectedSentence] = useState<{
-    text: string;
-    hash: string;
-  }>({ text: "", hash: "" });
+  const [forbiddenWords, setForbiddenWords] = useState<string>(defaultForbiddenWords);
+  const [prompt, setPrompt] = useState<string>(defaultPrompt);
+  const [sentences, setSentences] = useState<{ text: string; hash: string }[]>([]);
+  const [selectedSentence, setSelectedSentence] = useState<{ text: string; hash: string }>({ text: "", hash: "" });
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState("An error has occured, please try again");
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const handleClick = () => {
+  const handleClick = (message = "An error has occured, please try again") => {
+    setErrorMessage(message);
     setError(true);
   };
 
-  const handleClose = (event: any, reason: string) => {
-    if (reason === "clickaway") {
+  const handleClose = (event: React.SyntheticEvent | Event, reason: string) => {
+    if (reason === "clickaway") return;
+    setError(false);
+  };
+
+  const validateForbiddenWords = (words: string): boolean => {
+    if (!words.trim()) return true;
+    const wordArray = words.split(',').map(w => w.trim());
+    return wordArray.every(word => !word.includes(' '));
+  };
+
+
+
+  const handleSave = async () => {
+    if (!validateForbiddenWords(forbiddenWords)) {
+      handleClick("Forbidden words must be single words separated by commas");
       return;
     }
 
-    setError(false);
+    try {
+      setLoading(true);
+      const result = await fetch("/api/config", {
+        method: "POST",
+        body: JSON.stringify({ forbiddenWords, prompt }),
+      });
+
+      if (!result.ok) {
+        handleClick();
+        return;
+      }
+    } catch (error) {
+      console.log("error in handleSave", error);
+      handleClick();
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchConfig = async () => {
+    try {
+      const result = await fetch("/api/config");
+      const data = await result.json();
+      
+      if (data.data) {
+        setForbiddenWords(data.data.forbidden_words);
+        setPrompt(data.data.prompt);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.log("error in fetchConfig", error);
+      handleClick();
+    }
+  };
+
+  const handleReset = () => {
+    setLoading(true);
+    fetchConfig()
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     if (audioUrl && audioRef.current) {
@@ -41,27 +97,30 @@ const Home = () => {
   }, [audioUrl]);
 
   const onSubmit = async () => {
-    setLoading(true);
-    const result = await fetch("/api/lyrics", {
-      method: "POST",
-      body: JSON.stringify({ text }),
-    });
-
-    const data = await result?.json();
-
-    if (data?.error === "Forbidden input") {
-      handleClick();
+    try {
+      setLoading(true);
+      const result = await fetch("/api/lyrics", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+  
+      const data = await result?.json();
+  
+      if (data?.error === "Forbidden input") {
+        handleClick();
+        setLoading(false);
+        return;
+      }
+  
+      setSentences(data?.data);
       setLoading(false);
-      return;
+    } catch(e) {
+      console.log('error in onSubmit', e)
+      setLoading(false);
     }
-
-    setSentences(data?.data);
-    setLoading(false);
   };
 
-  const onSentenceSelect = (sentence: any) => {
-    setSelectedSentence(sentence);
-  };
+  const onSentenceSelect = (sentence: { text: string; hash: string }) => setSelectedSentence(sentence);
 
   const generateSong = async () => {
     setLoading(true);
@@ -87,10 +146,46 @@ const Home = () => {
         open={error}
         autoHideDuration={3000}
         onClose={handleClose}
-        message="An error has occured, please try again"
+        message={errorMessage}
       />
-      <div className="flex flex-col space-y-4">
-        <p className="text-black text-center">Jingle song generator</p>
+      <div className="flex flex-col space-y-4 w-full max-w-xl px-4">
+        <p className="text-black text-center text-xl font-bold">Jingle song generator</p>
+        
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Forbidden Words - Separate by comma</label>
+          <textarea
+            className="w-full min-h-[100px] rounded-lg border border-gray-300 px-4 py-2 text-black focus:border-blue-500 focus:outline-none resize"
+            value={forbiddenWords}
+            onChange={(e) => setForbiddenWords(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Prompt</label>
+          <textarea
+            className="w-full min-h-[100px] rounded-lg border border-gray-300 px-4 py-2 text-black focus:border-blue-500 focus:outline-none resize"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <button
+            onClick={handleReset}
+            className="flex-1 rounded-lg bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 focus:outline-none"
+            disabled={loading}
+          >
+            Reset
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 rounded-lg bg-green-500 px-4 py-2 text-white hover:bg-green-600 focus:outline-none"
+            disabled={loading}
+          >
+            Save
+          </button>
+        </div>
+
         {sentences.length === 0 && (
           <>
             <input
@@ -109,11 +204,7 @@ const Home = () => {
                 onClick={onSubmit}
                 disabled={text === ""}
                 className={`rounded-lg px-4 py-2 text-white focus:outline-none cursor-pointer
-    ${
-      text === ""
-        ? "bg-gray-400 cursor-not-allowed"
-        : "bg-blue-500 hover:bg-blue-600"
-    }`}
+                ${text === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"}`}
               >
                 Submit
               </button>
@@ -160,7 +251,7 @@ const Home = () => {
             ) : (
               <>
                 <button
-                  onClick={() => generateSong()}
+                  onClick={generateSong}
                   className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
                 >
                   Generate song

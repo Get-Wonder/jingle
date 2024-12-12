@@ -4,13 +4,21 @@ import { OpenAI } from "openai";
 import crypto from "crypto";
 import { syllable } from "syllable";
 
+async function getConfig() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/config`);
+  const data = await res.json();
+  return data.data;
+}
+
 export async function POST(request: NextRequest) {
   console.time("lyrics-api");
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
   const SALT = process.env.SALT;
 
-  const forbiddenWords = ["monarch", "butterflies", "worker", "immigration"];
+  const config = await getConfig();
+  console.log('CONFIG', config)
+  const forbiddenWords = [config?.forbidden_words] || [];
 
   const addSalt = (text: string) => {
     return text + SALT;
@@ -43,25 +51,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const forbiddenTopics = [
-      "Monarchs",
-      "Butterflies",
-      "Workers",
-      "Immigrants",
-    ];
 
-    if (forbiddenTopics.some((topic: string) => text?.includes(topic))) {
+
+    if (forbiddenWords.some((topic: string) => text?.includes(topic))) {
       return NextResponse.json(
         { error: "Forbidden input", success: false },
         { status: 400 }
       );
     }
 
+    const prompt = config?.prompt || '';
+
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: "system",
         content:
-          'Transform the given text into 15 different ways suitable for singing to someone as a jingle. Each way should: Be exactly 8 syllables. Use consistent verb tense appropriate for addressing the person directly (e.g., “you” instead of “she”). Use words with many letters when possible. Preserve the meaning of the original text. Be varied in structure. Prohibited Words: [“Politics”, “Drugs”, “Weapons”, “Violence”, “Monarchs”, “Butterflies”, "Workers", "Immigrants"]. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Provide an array containing 15 objects. Each object should have a “text” key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]',
+          `${prompt} Prohibited Words: [${forbiddenWords}]. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
       },
       { role: "user", content: text },
     ];

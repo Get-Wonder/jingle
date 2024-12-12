@@ -6,9 +6,9 @@ declare global {
 }
 
 const redisHost = process.env.REDIS_HOSTNAME;
-const redisPassword = process.env.REDIS_PASSWORD;
+// const redisPassword = process.env.REDIS_PASSWORD;
 
-
+const redisPassword = "he@$6&Lzh4XkRJ$_";
 
 export const createQueueConnection = () => {
   if (!global.queueConnection) {
