@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   const config = await getConfig();
   console.log('CONFIG', config)
-  const forbiddenWords = [config?.forbidden_words] || [];
+  const forbiddenWords = [config?.forbidden_words];
 
   const addSalt = (text: string) => {
     return text + SALT;
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       {
         role: "system",
         content:
-          `${prompt} Prohibited Words: [${forbiddenWords}]. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
+          `${prompt}. Prohibited Words: [${forbiddenWords}]. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
       },
       { role: "user", content: text },
     ];
