@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { CircularProgress, Snackbar } from "@mui/material";
+import { syllable } from "syllable";
 
 const defaultForbiddenWords = "default forbidden words";
 const defaultPrompt = "default prompt";
@@ -40,8 +41,12 @@ const Home = () => {
     return wordArray.every((word) => !word.includes(" "));
   };
 
-  const validateExamples = (examples: Array<{input: string, output: string}>): boolean => {
-    return examples.every(example => example.input.trim() !== "" && example.output.trim() !== "");
+  const validateExamples = (examples: Array<{input: string, output: string}>) => {
+    const validEmpty = examples.every(example => example.input.trim() !== "" && example.output.trim() !== "");
+    console.log('validEmpty', validEmpty)
+   const correctSyllable = examples.every(example => syllable(example.output) === 8)
+
+    return { valid: (validEmpty && correctSyllable), correctSyllable, validEmpty }
   };
 
   const handleSave = async () => {
@@ -54,9 +59,14 @@ const Home = () => {
       handleClick("Prompt cannot be empty");
       return;
     }
-
-    if (!validateExamples(examples)) {
-      handleClick("All example inputs and outputs must be filled");
+    const { valid, correctSyllable, validEmpty } = validateExamples(examples)
+    if (!valid) {
+      if(!validEmpty) {
+        handleClick("All example inputs and outputs must be filled");
+      }
+      if(!correctSyllable) {
+        handleClick("All example outputs must be 8 syllables");
+      }
       return;
     }
 
