@@ -13,45 +13,46 @@ async function getConfig() {
 export async function POST(request: NextRequest) {
   console.time("lyrics-api");
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
-
   const SALT = process.env.SALT;
 
-  const config = await getConfig();
-  console.log('CONFIG', config)
-  const forbiddenWords = [config?.forbidden_words];
-
-  const addSalt = (text: string) => {
-    return text + SALT;
-  };
-
+  const addSalt = (text: string) => text + SALT;
   const createMD5 = (text: string) => {
     const textWithSalt = addSalt(text);
     return crypto.createHash("md5").update(textWithSalt).digest("hex");
   };
 
   try {
-    const { text }: { text: string } = await request.json();
+    const { text, prompt: customPrompt, forbiddenWords: customForbiddenWords }: { 
+      text: string;
+      prompt?: string;
+      forbiddenWords?: string;
+    } = await request.json();
+
+    let forbiddenWords: string[] = [];
+    let prompt = '';
+
+    if (!customPrompt || !customForbiddenWords) {
+      const config = await getConfig();
+      forbiddenWords = [config?.forbidden_words];
+      prompt = config?.prompt || '';
+    } else {
+      forbiddenWords = [customForbiddenWords];
+      prompt = customPrompt;
+    }
 
     if (text === "") {
       return NextResponse.json(
-        {
-          error: "The text cannot be empty",
-          success: false,
-        },
+        { error: "The text cannot be empty", success: false },
         { status: 400 }
       );
     }
 
-    if (text !== "" && text.length > 300) {
+    if (text.length > 300) {
       return NextResponse.json(
-        {
-          error: "The text must contain less than 300 characters",
-          success: false,
-        },
+        { error: "The text must contain less than 300 characters", success: false },
         { status: 400 }
       );
     }
-
 
     if (forbiddenWords.some((topic: string) => text?.includes(topic))) {
       return NextResponse.json(
@@ -60,13 +61,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = config?.prompt || '';
-
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: "system",
-        content:
-          `${prompt}.  Prohibited Words: ${forbiddenWords}. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Create exactly 15 different variations. Each way should: Be exactly 8 syllables. Use words with many letters when possible. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
+        content: `${prompt}. Prohibited Words: ${forbiddenWords}. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Create exactly 15 different variations. Each way should: Be exactly 8 syllables. Use words with many letters when possible. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
       },
       { role: "user", content: text },
     ];
@@ -86,17 +84,9 @@ export async function POST(request: NextRequest) {
         model: "gpt-4o",
       });
 
-      console.log(
-        "completion.choices[0].message.content",
-        completion.choices[0].message.content,
-        typeof completion.choices[0].message.content
-      );
-
       const result: any = await JSON.parse(
         completion.choices[0].message.content
       );
-
-      console.log("result", result);
 
       if (result?.error) {
         return NextResponse.json(
@@ -107,7 +97,6 @@ export async function POST(request: NextRequest) {
 
       if (result?.length > 0) {
         result.forEach((element: any) => {
-          console.log("Contando", element?.text, syllable(element?.text));
           if (
             examplesOfSevensyllable.length < 3 &&
             syllable(element?.text) === 8
@@ -127,31 +116,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resultadosConHash = examplesOfSevensyllable.map((example: string) => {
-      const isFromUser = text === example;
+    const resultadosConHash = examplesOfSevensyllable.map((example: string) => ({
+      text: example,
+      hash: createMD5(example),
+      isFromUser: text === example,
+    }));
 
-      return {
-        text: example,
-        hash: createMD5(example),
-        isFromUser,
-      };
-    });
-
-    forbiddenWords.forEach((word: string) => {
-      if (
-        resultadosConHash.some((result: { text: string; hash: string }) =>
-          result?.text.includes(word)
-        )
-      ) {
-        return NextResponse.json({ error: "Forbidden input" }, { status: 500 });
-      }
-    });
+    if (forbiddenWords.some(word => 
+      resultadosConHash.some((result: any) => result?.text.includes(word))
+    )) {
+      return NextResponse.json({ error: "Forbidden input" }, { status: 500 });
+    }
 
     return NextResponse.json(
       { success: true, data: [...resultadosConHash] },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (e) {
     console.log("error in lyrics", e);

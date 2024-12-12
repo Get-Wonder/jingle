@@ -35,8 +35,6 @@ const Home = () => {
     return wordArray.every(word => !word.includes(' '));
   };
 
-
-
   const handleSave = async () => {
     if (!validateForbiddenWords(forbiddenWords)) {
       handleClick("Forbidden words must be single words separated by commas");
@@ -101,7 +99,7 @@ const Home = () => {
       setLoading(true);
       const result = await fetch("/api/lyrics", {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, prompt, forbiddenWords }),
       });
   
       const data = await result?.json();
@@ -169,22 +167,13 @@ const Home = () => {
           />
         </div>
 
-        <div className="flex justify-between gap-4">
-          <button
-            onClick={handleReset}
-            className="flex-1 rounded-lg bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 focus:outline-none"
-            disabled={loading}
-          >
-            Reset
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 rounded-lg bg-green-500 px-4 py-2 text-white hover:bg-green-600 focus:outline-none"
-            disabled={loading}
-          >
-            Save
-          </button>
-        </div>
+        <button
+          onClick={handleReset}
+          className="rounded-lg bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 focus:outline-none"
+          disabled={loading}
+        >
+          Reset
+        </button>
 
         {sentences.length === 0 && (
           <>
@@ -284,6 +273,14 @@ const Home = () => {
             Go back
           </button>
         )}
+
+        <button
+          onClick={handleSave}
+          className="rounded-lg bg-green-500 px-4 py-2 text-white hover:bg-green-600 focus:outline-none mt-8"
+          disabled={loading}
+        >
+          Save Prompt
+        </button>
       </div>
     </div>
   );
