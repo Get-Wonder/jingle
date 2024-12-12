@@ -192,7 +192,7 @@ const Home = () => {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gray-100">
+    <div className="flex min-h-screen w-full items-center justify-center bg-gray-100">
       <Snackbar
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         open={error}
