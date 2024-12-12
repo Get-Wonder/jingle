@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
 import crypto from "crypto";
 import { syllable } from "syllable";
+import { trackLyricsGeneration } from "@/app/lib/analytics";
 
 export async function POST(request: NextRequest) {
+  const startTime = performance.now();
   console.time("lyrics-api");
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
@@ -116,6 +118,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (examplesOfSevensyllable.length === 0) {
+      const duration = Math.round(performance.now() - startTime);
+      await trackLyricsGeneration(false, duration, retryCount);
       return NextResponse.json(
         { error: "An error has occurred, please try again" },
         { status: 500 }
@@ -142,6 +146,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    const duration = Math.round(performance.now() - startTime);
+    await trackLyricsGeneration(true, duration, retryCount);
     return NextResponse.json(
       { success: true, data: [...resultadosConHash] },
       {
@@ -150,6 +156,8 @@ export async function POST(request: NextRequest) {
     );
   } catch (e) {
     console.log("error in lyrics", e);
+    const duration = Math.round(performance.now() - startTime);
+    await trackLyricsGeneration(false, duration, 0);
     return NextResponse.json(
       { error: "An error has occurred, please try again" },
       { status: 500 }

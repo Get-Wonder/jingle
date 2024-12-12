@@ -28,3 +28,31 @@ export const trackJobCompletion = async (
     console.error("Error tracking job:", error);
   }
 };
+
+export const trackLyricsGeneration = async (
+  success: boolean,
+  duration?: number,
+  attempts?: number
+) => {
+  try {
+    await fetch(`${PLAUSIBLE_URL}/api/event`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.PLAUSIBLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        name: "lyrics_generation",
+        domain: DOMAIN,
+        url: `https://${DOMAIN}/generate`,
+        props: {
+          status: success ? "completed" : "failed",
+          duration: duration || 0,
+          attempts: attempts || 1,
+        },
+      }),
+    });
+  } catch (error) {
+    console.error("Error tracking lyrics generation:", error);
+  }
+};
