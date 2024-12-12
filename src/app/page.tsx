@@ -3,28 +3,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CircularProgress, Snackbar } from "@mui/material";
 
-const defaultForbiddenWords = "";
-const defaultPrompt = "";
+const defaultForbiddenWords = "default forbidden words";
+const defaultPrompt = "default prompt";
 
 const Home = () => {
   const [text, setText] = useState<string>("");
-  const [forbiddenWords, setForbiddenWords] = useState<string>(
-    defaultForbiddenWords
-  );
+  const [forbiddenWords, setForbiddenWords] = useState<string>(defaultForbiddenWords);
   const [prompt, setPrompt] = useState<string>(defaultPrompt);
-  const [sentences, setSentences] = useState<{ text: string; hash: string }[]>(
-    []
-  );
-  const [selectedSentence, setSelectedSentence] = useState<{
-    text: string;
-    hash: string;
-  }>({ text: "", hash: "" });
+  const [examples, setExamples] = useState<Array<{input: string, output: string}>>([
+    {input: "", output: ""}, 
+    {input: "", output: ""},
+    {input: "", output: ""}
+  ]);
+  const [sentences, setSentences] = useState<{ text: string; hash: string }[]>([]);
+  const [selectedSentence, setSelectedSentence] = useState<{text: string; hash: string}>({ text: "", hash: "" });
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState(
-    "An error has occured, please try again"
-  );
+  const [errorMessage, setErrorMessage] = useState("An error has occured, please try again");
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -39,9 +35,13 @@ const Home = () => {
   };
 
   const validateForbiddenWords = (words: string): boolean => {
-    if (!words.trim()) return true;
+    if (!words.trim()) return false;
     const wordArray = words.split(",").map((w) => w.trim());
     return wordArray.every((word) => !word.includes(" "));
+  };
+
+  const validateExamples = (examples: Array<{input: string, output: string}>): boolean => {
+    return examples.every(example => example.input.trim() !== "" && example.output.trim() !== "");
   };
 
   const handleSave = async () => {
@@ -50,11 +50,21 @@ const Home = () => {
       return;
     }
 
+    if (!prompt.trim()) {
+      handleClick("Prompt cannot be empty");
+      return;
+    }
+
+    if (!validateExamples(examples)) {
+      handleClick("All example inputs and outputs must be filled");
+      return;
+    }
+
     try {
       setLoading(true);
       const result = await fetch("/api/config", {
         method: "POST",
-        body: JSON.stringify({ forbiddenWords, prompt }),
+        body: JSON.stringify({ forbiddenWords, prompt, examples }),
       });
 
       if (!result.ok) {
@@ -69,6 +79,12 @@ const Home = () => {
     }
   };
 
+  const handleExampleChange = (index: number, field: 'input' | 'output', value: string) => {
+    const newExamples = [...examples];
+    newExamples[index][field] = value;
+    setExamples(newExamples);
+  };
+
   const fetchConfig = async () => {
     try {
       const result = await fetch("/api/config");
@@ -77,6 +93,9 @@ const Home = () => {
       if (data.data) {
         setForbiddenWords(data.data.forbidden_words);
         setPrompt(data.data.prompt);
+        if (data.data.examples) {
+          setExamples(data.data.examples);
+        }
       }
       setLoading(false);
     } catch (error) {
@@ -104,11 +123,26 @@ const Home = () => {
   }, [audioUrl]);
 
   const onSubmit = async () => {
+    if (!validateForbiddenWords(forbiddenWords)) {
+      handleClick("Forbidden words must be single words separated by commas");
+      return;
+    }
+
+    if (!prompt.trim()) {
+      handleClick("Prompt cannot be empty");
+      return;
+    }
+
+    if (!validateExamples(examples)) {
+      handleClick("All example inputs and outputs must be filled");
+      return;
+    }
+
     try {
       setLoading(true);
       const result = await fetch("/api/lyrics", {
         method: "POST",
-        body: JSON.stringify({ text, prompt, forbiddenWords }),
+        body: JSON.stringify({ text, prompt, forbiddenWords, examples }),
       });
 
       const data = await result?.json();
@@ -181,6 +215,30 @@ const Home = () => {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+        </div>
+
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Examples
+          </label>
+          {examples.map((example, index) => (
+            <div key={index} className="flex space-x-4">
+              <input
+                type="text"
+                className="w-1/2 rounded-lg border border-gray-300 px-4 py-2 text-black focus:border-blue-500 focus:outline-none"
+                placeholder="Input"
+                value={example.input}
+                onChange={(e) => handleExampleChange(index, 'input', e.target.value)}
+              />
+              <input
+                type="text"
+                className="w-1/2 rounded-lg border border-gray-300 px-4 py-2 text-black focus:border-blue-500 focus:outline-none"
+                placeholder="Output"
+                value={example.output}
+                onChange={(e) => handleExampleChange(index, 'output', e.target.value)}
+              />
+            </div>
+          ))}
         </div>
 
         <button
@@ -303,7 +361,7 @@ const Home = () => {
           } mt-8`}
           disabled={loading || sentences.length === 0}
         >
-          Save Prompt
+          Use Prompt in live service
         </button>
       </div>
     </div>

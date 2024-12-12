@@ -22,22 +22,26 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const { text, prompt: customPrompt, forbiddenWords: customForbiddenWords }: { 
+    const { text, prompt: customPrompt, forbiddenWords: customForbiddenWords, examples: customExamples }: { 
       text: string;
       prompt?: string;
       forbiddenWords?: string;
+      examples?: any[];
     } = await request.json();
 
     let forbiddenWords: string[] = [];
     let prompt = '';
+    let examples = []
 
-    if (!customPrompt || !customForbiddenWords) {
+    if (!customPrompt || !customForbiddenWords || !customExamples) {
       const config = await getConfig();
       forbiddenWords = [config?.forbidden_words];
       prompt = config?.prompt || '';
+      examples = config?.examples || [];
     } else {
       forbiddenWords = [customForbiddenWords];
       prompt = customPrompt;
+      examples = customExamples;
     }
 
     if (text === "") {
@@ -60,11 +64,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
+console.log('examples', examples)
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: "system",
-        content: `${prompt}. Prohibited Words: ${forbiddenWords}. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Create exactly 15 different variations. Each way should: Be exactly 8 syllables. Use words with many letters when possible. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ]`,
+        content: `${prompt}. Prohibited Words: ${forbiddenWords}. Only check for the exact words listed. If the input text contains any of these exact words, then return the following JSON object: { "error": true }. Create exactly 15 different variations. Each way should: Be exactly 8 syllables. Use words with many letters when possible. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ], Examples of conversion: ${examples}`,
       },
       { role: "user", content: text },
     ];
