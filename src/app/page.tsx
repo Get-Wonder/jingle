@@ -259,7 +259,7 @@ const Home = () => {
           Reset
         </button>
 
-        {sentences.length === 0 && (
+        {sentences?.length === 0 && (
           <>
             <input
               type="text"
@@ -289,7 +289,7 @@ const Home = () => {
           </>
         )}
 
-        {sentences.length > 0 && (
+        {sentences?.length > 0 && (
           <div>
             <p className="text-black mb-4">Select one of the following:</p>
             <ul className="space-y-2">
@@ -348,7 +348,7 @@ const Home = () => {
             )}
           </>
         )}
-        {sentences.length > 0 && (
+        {sentences?.length > 0 && (
           <button
             onClick={() => {
               setSelectedSentence({ text: "", hash: "" });
@@ -365,11 +365,11 @@ const Home = () => {
         <button
           onClick={handleSave}
           className={`rounded-lg px-4 py-2 text-white focus:outline-none ${
-            loading || sentences.length === 0
+            loading || sentences?.length === 0
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-green-500 hover:bg-green-600"
           } mt-8`}
-          disabled={loading || sentences.length === 0}
+          disabled={loading || sentences?.length === 0}
         >
           Use Prompt in live service
         </button>
