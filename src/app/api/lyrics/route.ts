@@ -34,8 +34,13 @@ export async function POST(request: NextRequest) {
     text: string,
     forbiddenWords: string[]
   ): boolean => {
-    const words = text.split(/\s+/);
-    return forbiddenWords.some((word) => words.includes(word));
+    const processedForbiddenWords = forbiddenWords.flatMap(word => 
+      word.includes(',') ? word.split(',').map(w => w.trim()) : word
+    );
+    
+    return processedForbiddenWords.some(word => 
+      text.toLowerCase().includes(word.toLowerCase())
+    );
   };
 
   try {
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
+    console.log('forbiddenWords', containsForbiddenWord(text, forbiddenWords))
     if (containsForbiddenWord(text, forbiddenWords)) {
       return NextResponse.json(
         { error: "Forbidden input", success: false },
