@@ -30,6 +30,14 @@ export async function POST(request: NextRequest) {
     return content.trim();
   };
 
+  const containsForbiddenWord = (
+    text: string,
+    forbiddenWords: string[]
+  ): boolean => {
+    const words = text.split(/\s+/);
+    return forbiddenWords.some((word) => words.includes(word));
+  };
+
   try {
     const {
       text,
@@ -46,7 +54,6 @@ export async function POST(request: NextRequest) {
     let forbiddenWords: string[] = [];
     let prompt = "";
     let examples = [];
-    let words = 7;
 
     if (!customPrompt || !customForbiddenWords || !customExamples) {
       const config = await getConfig();
@@ -76,17 +83,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (forbiddenWords.some((topic: string) => text?.includes(topic))) {
+    if (containsForbiddenWord(text, forbiddenWords)) {
       return NextResponse.json(
         { error: "Forbidden input", success: false },
         { status: 400 }
       );
     }
+
     console.log("examples", examples);
     let retryCount = 0;
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10;
     let examplesOfSevensyllable: any = [];
     const eightSyllableExamples: any = [];
+    let words = 7;
 
     if (syllable(text) === 8) {
       examplesOfSevensyllable.push(text);
@@ -99,7 +108,7 @@ export async function POST(request: NextRequest) {
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         {
           role: "system",
-          content: `instructions: ${prompt}. Create exactly 15 different variations aiming for ${words} words each. The quantity of words is more important than the first instructions. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ], Examples of conversion: ${examples}`,
+          content: `instructions: ${prompt}. Create 20 different variations that must be ${words} words each no matter the length of the input, if the input is too big, you can make it smaller, you dont need to keep the same words, you can change them to make it to ${words} words. The quantity of words is more important than the first instructions. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ], Examples of conversion and desired length of output: ${examples}`,
         },
         {
           role: "user",
@@ -107,25 +116,30 @@ export async function POST(request: NextRequest) {
         },
       ];
 
-      const completion: any = await openai.chat.completions.create({
-        messages,
-        model: "gpt-4o",
-      });
-      console.log(
-        "completion.choices[0].message.content",
-        completion.choices[0].message.content
-      );
-      const cleanedContent = cleanMarkdownFormatting(
-        completion.choices[0].message.content
-      );
+      const generateLyrics = async () => {
+        const completion: any = await openai.chat.completions.create({
+          messages,
+          model: "gpt-4o",
+        });
+        console.log(
+          "completion.choices[0].message.content",
+          completion.choices[0].message.content
+        );
+        const cleanedContent = cleanMarkdownFormatting(
+          completion.choices[0].message.content
+        );
+        const result: any = await JSON.parse(cleanedContent);
+        return result;
+      };
 
-      const result: any = await JSON.parse(cleanedContent);
-      const resultWithSyllables = result.map((item: any) => ({
-        text: item.text,
-        syllables: syllable(item.text),
-      }));
+      let result: any = { error: true }
 
-      console.log("resultWithSyllables", resultWithSyllables);
+      try {
+        result = await generateLyrics();
+      } catch (e) {
+        result = await generateLyrics();
+        console.log("error in parse", e);
+      }
 
       if (result?.error) {
         return NextResponse.json(
@@ -134,15 +148,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const resultWithSyllables = result.map((item: any) => ({
+        text: item.text,
+        syllables: syllable(item.text),
+      }));
+
+      console.log("resultWithSyllables", resultWithSyllables);
+
       if (result?.length > 0) {
+        let gotEightSyllable = false;
         result.forEach((element: any) => {
-          if (
-            examplesOfSevensyllable.length < 3 &&
-            syllable(element?.text) === 8
-          ) {
-            examplesOfSevensyllable.push(element?.text);
-          }
-          if (syllable(element?.text) === 8) {
+          const syllableCount = syllable(element?.text);
+          if (syllableCount === 8) {
+            gotEightSyllable = true;
+            if (examplesOfSevensyllable.length < 3) {
+              examplesOfSevensyllable.push(element?.text);
+            }
             eightSyllableExamples.push(element?.text);
           }
         });
@@ -154,10 +175,10 @@ export async function POST(request: NextRequest) {
           syllableCounts.reduce((a: number, b: number) => a + b, 0) /
           syllableCounts.length;
 
-        if (averageSyllables > 8) {
-          words -= Math.ceil(averageSyllables - 8);
-        } else if (averageSyllables < 8) {
-          words += Math.ceil(8 - averageSyllables);
+        if (averageSyllables > 8 && !gotEightSyllable && words > 3) {
+          words -= 1;
+        } else if (averageSyllables < 8 && !gotEightSyllable) {
+          words += 1;
         }
       }
 
@@ -174,6 +195,7 @@ export async function POST(request: NextRequest) {
                     -Build on original meaning naturally (if "I love my wife" -> "I love my wife more each day")
                     -Keep same subject/relationship
                     -Feel natural, not forced
+                    -You cannot change the words, you must select the best 3.
 
                     Reject any that:
 
@@ -194,9 +216,11 @@ export async function POST(request: NextRequest) {
         model: "gpt-4o",
       });
 
-      const selectedExamples: any = await JSON.parse(
+      const cleanedContent = cleanMarkdownFormatting(
         selectionCompletion.choices[0].message.content
       );
+
+      const selectedExamples: any = await JSON.parse(cleanedContent);
 
       console.log("selectedExamples", selectedExamples);
 

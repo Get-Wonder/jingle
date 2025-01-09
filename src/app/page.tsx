@@ -158,7 +158,7 @@ const Home = () => {
       const data = await result?.json();
 
       if (data?.error === "Forbidden input") {
-        handleClick();
+        handleClick("Forbidden input");
         setLoading(false);
         return;
       }
