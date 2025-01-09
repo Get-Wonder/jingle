@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         {
           role: "system",
-          content: `instructions: ${prompt}. Create 20 different variations that must be ${words} words each no matter the length of the input, if the input is too big, you can make it smaller, you dont need to keep the same words, you can change them to make it to ${words} words. The quantity of words is more important than the first instructions. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ], Examples of conversion and desired length of output: ${examples}`,
+          content: `instructions: ${prompt}. Create 20 different variations that must be ${words} words each no matter the length of the input, if the input is too big, you can make it smaller, you dont need to keep the same words, you can change them to make it to ${words} words. The quantity of words is more important than the first instructions. Do a profanity filter, if the input contains any bad word return { "error": true }. Output Format: Provide an array containing 15 objects. Each object should have a "text" key with the option as its value. Do not include any additional text or formatting. Output: [ { "text": "" }, { "text": "" }, … ], Examples of conversion and desired length of output: ${examples}`,
         },
         {
           role: "user",
